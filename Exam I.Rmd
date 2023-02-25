@@ -1,0 +1,397 @@
+---
+title: "Exam I"
+author: "Lauren Blakeley"
+date: '2022-07-14'
+output: html_document
+---
+
+title: "HW #2 - Time Series Data"
+author: Lauren Blakeley & lblak2@unh.newhaven.edu
+output: html_document
+   
+editor_options: 
+  chunk_output_type: inline
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+options(repos = list(CRAN="http://cran.rstudio.com/"))
+Sys.Date()
+library(tidyverse)
+library(fpp3)
+library(ggplot2)
+library(readxl)
+library(tsibble)
+library(ggpubr)
+library(ggfortify)
+```
+
+
+#Book: 3.7; Question#1
+
+```{r}
+library(ggpubr)
+###Consider the GDP information in global_economy.
+global_economy
+###a.Plot the GDP per capita for each 3 countries that you choose over time. 
+global_economy$Country <- as.factor(global_economy$Country)
+global_economy <- global_economy %>% mutate(gdpPercap = global_economy$GDP/global_economy$Population)
+
+###United States
+Global_Economy_US <- global_economy %>% filter(Country == "United States")
+GE_US <- ggplot(Global_Economy_US, aes(x = Year, y = gdpPercap)) + geom_point() + ggtitle("GDP Per Capita over Time in the US")
+
+###Spain
+Global_Economy_Spain <- global_economy %>% filter(Country == "Spain")
+GE_Spain <- ggplot(Global_Economy_Spain, aes(x = Year, y = gdpPercap)) + geom_point()+ ggtitle("GDP Per Capita over Time in Spain")
+
+###Kenya
+Global_Economy_Kenya <- global_economy %>% filter(Country == "Kenya")
+GE_Kenya <- ggplot(Global_Economy_Kenya, aes(x = Year, y = gdpPercap)) + geom_point()+ ggtitle("GDP Per Capita over Time in Kenya")
+
+
+
+###b.Among all countries, which country has the highest GDP per capita? 
+ggarrange(
+  GE_US, GE_Spain, GE_Kenya, ncol = 1, nrow = 3, heights = c(1,1,1))
+
+###I have arranged my charts from highest GDP per capita to lowest out of the three countries I chose (the United States, Spain, and Kenya). The United States has the highest GDP per capita out of the three countries I chose.
+
+
+###c.How GDP per capita has changed over time for these 3 countries you chose in part a?
+
+###From 1960 to 2017, the United States's GDP per capita has grown at a fairly constant, steady rate, with only a slight dip around 2008 (likely from the 2008 recession). GDP per capita in the US grew to about $60,000 by 2017. Next, from 1960 to 1980, Spain's GDP per capita grew slowly, but seemed to have a positive slope. Then, from 1980 to 2008, while the trend ultimately led upward (from less than $10,000 per capita to about $40,000). In 2008, the trend changed and as of 2017 GDP per capita for Spain was closer to $30,000. Finally, from 1960 to 2005, GDP per capita did not exceed $600 in Kenya. However, around 2005 Kenya's GDP per capita began to trend upward, and by 2017 it was up to $1600.
+```
+
+#Book: 3.7; Question#2
+
+```{r}
+##For each of the following series, make a graph of the data. If transforming seems appropriate, do so and describe the effect.
+###a.United States GDP from global_economy.
+
+GE_Tsibble_US <- global_economy %>%
+  as_tsibble(
+    index = Year,
+    key = c(Country, Code, GDP, Growth, CPI, Imports, Exports, Population))%>% filter(Country =="United States")
+
+###autoplot is not working for this graph as I am getting the error that I do not have enough memory to complete this action, so I will be graphing in ggplot for question #2.
+
+ggplot(GE_Tsibble_US, aes(x= Year, y=GDP))+
+geom_point(colour="blue")+
+  ggtitle("GDP by Year in the United States")
+
+###b.Slaughter of Victorian “Bulls, bullocks and steers”  in aus_livestock.
+
+ggplot(aus_livestock, aes(x=Month, y=Animal))+
+  geom_point()
+
+aus_livestock <- filter(aus_livestock, Animal =="Bulls, bullocks and steers")
+aus_livestock_ts <- ts(aus_livestock, start = 1972, end = 2018, frequency = 12)
+aus_livestock_ts
+autoplot(aus_livestock_ts[, "Count"])
+ggplot(aus_livestock, aes(x=Month, y=Count))+
+  geom_point()+
+  ggtitle("Count of Bulls, bullocks, and Steers slaughtered by Month")
+
+###c.Victorian Electricity Demand from vic_elec.
+vic_elec
+ggplot(vic_elec, aes(x=Time, y=Demand))+
+  geom_point()+
+  ggtitle("Demand for Electricity in Victoria by Time and Day")
+help("aus_production")
+aus_production
+
+
+###d.Gas production from aus_production
+ggplot(aus_production, aes(x=Quarter, y=Gas))+
+  geom_point()+
+  ggtitle("Production of Gas in Australia by Quarter")
+
+```
+
+#Book: 3.7; Question#10
+
+```{r}
+###Use the Canadian_gas data (monthly Canadian gas production in billions of cubic metres, January 1960 – February 2005).
+canadian_gas
+###a. Plot the data using autoplot(), gg_subseries() , gg_season() to look at the effect of the changing seasonality over time.
+autoplot(canadian_gas)
+
+gg_subseries(canadian_gas)
+
+gg_season(canadian_gas)
+###b. Do an STL decomposition of the data. You will need to choose a seasonal window to allow for the changing shape of the seasonal component.
+canadian_gas %>%
+  model(STL(Volume~trend(window=10)+
+              season(window="periodic"),
+              robust = TRUE)) %>%
+  components() %>%
+  autoplot()
+
+###c. How does the seasonal shape change over time? [Hint: Try plotting the seasonal component using gg_season().]
+gg_season(canadian_gas)
+
+##The seasonal shape starts off as fairly flat in 1960. Then, over time, it develops peaks and troughs and a seasonal trend begins to be established. For instance, by 2005 (the most recent recorded year of the data, the Canadian gas production is trending with a trough in February and a peak in March. There are other troughs, such as in June and September, with another smaller peak in October.)
+
+###d. Can you produce a plausible seasonally adjusted series?
+PSAS <- canadian_gas %>% 
+  model(STL(Volume))
+  components(PSAS)
+  
+  canadian_gas%>%
+    autoplot(Volume, color="deepskyblue1")+
+    autolayer(components(PSAS),
+              season_adjust, color="darkmagenta")+
+    ggtitle("Canadian Gas Production by Quarter")
+    
+```
+
+#Book: 5.10; Question #7
+
+```{r}
+###For retail time series, use the below code:
+set.seed(12345678)
+myseries <- aus_retail %>%
+ filter(`Series ID` == sample(aus_retail$`Series ID`,1))
+
+###a. Create a training dataset consisting of observations before 2011 using
+myseries_train <- myseries %>%
+ filter(year(Month) < 2011)
+
+###b. Check that your data have been split appropriately by producing the following plot.
+autoplot(myseries, Turnover) +
+ autolayer(myseries_train, Turnover, colour = "red")
+###c. Fit a seasonal naïve model using SNAIVE() applied to your training data (myseries_train).
+fit <- myseries_train %>%
+ model(SNAIVE(Turnover))
+###d. Check the residuals.
+fit %>% gg_tsresiduals()
+###Do the residuals appear to be uncorrelated and normally distributed? 
+###The residuals do appear to be mostly normally distributed. Regarding the ACF lag plot, it appears that with each additional lag, the points are less and less correlated. However, more than 5% of the lags are out of bounds, which means that the residuals are not white noise and I believe this indicates some autocorrelation between residuals.
+
+###e. Produce forecasts for the test data
+fc <- fit %>% 
+forecast(new_data = anti_join(myseries,
+myseries_train))
+fc %>% autoplot(myseries)
+# Joining, by = c("State", "Industry", "Series ID", "Month", "Turnover")
+###f. Compare the accuracy of your forecasts against the actual values.
+fc %>% accuracy(myseries)
+fit %>% accuracy()
+###g. How sensitive are the accuracy measures to the amount of training data used?
+###The accuracy measures are very sensitive to the amount of training data used. The training data is necessary for the models to be formed, so the more training data that is used, the better the models will likely be (as long as they are not overfit) and the more accurate they should be.
+```
+
+#Book: 5.11: question #10
+
+```{r}
+###5a. Create a training set for Australian takeaway food turnover (aus_retail) by withholding the last four years as a test set.
+help(aus_retail)
+aus_retail
+
+aus_takeaway_food_services <- aus_retail %>%
+  filter(Industry == "Takeaway food services") %>%
+  select(State, Industry, Month, Turnover)%>%
+  summarize(TotalT = sum(Turnover))
+  
+aus_TFS_train <-  aus_takeaway_food_services %>%
+  filter(year(Month) < 2015)
+
+aus_TFS_valid <- aus_takeaway_food_services %>%
+  filter(year(Month)>=2015)
+
+###b. Fit all the appropriate benchmark methods to the training set and forecast the periods covered by the test set.
+aus_TFS_fit <- aus_TFS_train %>%
+  model(
+    Mean = MEAN(TotalT),
+    Naive = NAIVE(TotalT),
+    "Seasonal Naive" = SNAIVE(TotalT),
+    "Seasonal Naive Drift" = SNAIVE(TotalT~drift()),
+    Drift = RW(TotalT~drift()))
+
+aus_TFS_forecast <- aus_TFS_fit %>% forecast(h = 48)
+
+aus_TFS_forecast %>% autoplot(aus_takeaway_food_services %>% select(TotalT), level=NULL)
+
+aus_TFS_FC <- aus_TFS_fit %>% forecast(new_data=aus_TFS_valid)
+aus_TFS_FC %>% autoplot(aus_takeaway_food_services)
+###c. Compute the accuracy of your forecasts. Which method does best?
+
+accuracy(aus_TFS_forecast, aus_TFS_valid)
+
+###I believe the Seasonal Naive Drift forecast model is the best because it has the lowest root mean squared error and the lowest mean average error. This model appears to do the best job at predicting out of all of the models.
+
+###d. Do the residuals from the best method resemble white noise?
+aus_TFS_fit_Best <- aus_TFS_train %>% model("Seasonal Naive Drift"= SNAIVE(TotalT~drift()))
+aug_Best<- aus_TFS_train%>%
+  model(SNAIVE(TotalT~drift()))%>%
+  augment()
+autoplot(aug_Best, .resid)
+
+aug_Best %>% ACF(.resid) %>% autoplot
+
+###If less than 5% of the lags are out of bounds, then the residuals would be white noise. However, 14/25 of the lags are out of bounds, which means over 50% of the residuals are out of bounds, indicating that these residuals are not white noise.
+
+###6. Using the code below, get a series (it gets a series randomly by using sample() function):
+set.seed(12345678)
+myseries <- aus_retail %>%
+ filter(`Series ID` == sample(aus_retail$`Series ID`,1))
+###see head of your series to check it is a tsibble data,
+###and remove NA’s if there is any with these commands:
+head(myseries)
+myseries = myseries %>% filter(!is.na(`Series ID`))
+
+###a. What is the name of the series you randomly choose? Write it.
+###A3349767W
+###Run a linear regression of Turnover on trend.(Hint: use TSLM() and trend() functions)
+fit <- myseries %>% model(trend_model = TSLM(Turnover~ trend()))
+fit
+###See the regression result by report() command.
+report(fit)
+###b. By using this model, forecast it for the next 3 years. What are the values of the next 3 years, monthly values?
+fc <-fit %>% forecast(h = "3 years")
+fc
+###c. Plot the forecast values along with the original data.
+fc %>% autoplot(myseries)
+
+###d. Get the residuals from the model. And check the residuals to check whether or not it satisfies the requirements for white noise error terms.(hint: augment() and gg_tsresiduals() functions)
+
+aug <- myseries%>%
+  model(NAIVE(Turnover))%>%
+  augment()
+autoplot(aug, .resid)
+
+aug %>% ACF(.resid) %>% autoplot
+
+
+####There are 25 lags and 5% of 25 is;
+
+25*.05
+
+####1.25. So, if there are more than 1.25 lags out of bounds, the data series isn't white noise.
+###There are 13 lags out of bounds,which is more than 1.25, so the data series does not look likes white noise.
+
+```
+
+
+#Book: 5.11: question #11
+
+```{r}
+###7.Use the Bricks data from aus_production (Australian quarterly clay brick production 1956–2005) for this question 
+library(e1071)
+library(forecast)
+library(ggplot2)
+library(ggfortify)
+ help("aus_production")
+Bricks_Aus <- aus_production %>% filter_index("1956 Q1" ~ "2005 Q4") %>% select(Bricks)
+Bricks_Aus <- na.omit(Bricks_Aus)
+###a.Use an STL decomposition to calculate the trend-cycle and seasonal indices. (Experiment with having fixed or changing seasonality.)(hint: remove the NAs from the series before you start working with it) 
+stl_brick_fixed_seasonality <- stl(Bricks_Aus,
+                          s.window = "periodic",
+                          robust = TRUE )
+autoplot(stl_brick_fixed_seasonality)
+###b.Compute and plot the seasonally adjusted data. 
+stl_brick_changing_seasonality <- stl(Bricks_Aus,
+                             s.window = 5,
+                             robust =  TRUE)
+autoplot(stl_brick_changing_seasonality)
+###c. Use a naïve method to produce forecasts of the seasonally adjusted data. 
+ stl_brick_fixed_seasonality %>% seasadj() %>% naive() %>% autoplot()
+ 
+ stl_brick_changing_seasonality %>% seasadj() %>% naive() %>% autoplot()
+###d. Use decomposition_model() to reseasonalise the results, giving forecasts for the original data. Do the residuals look uncorrelated? 
+Bricks_Decomp <- Bricks_Aus %>%
+model(stlf = decomposition_model(
+STL(Bricks ~ trend(window = 7), robust = TRUE),
+NAIVE(season_adjust)
+))%>%
+forecast()
+
+Decomp_Bricks <- Bricks_Aus %>% model(STL(Bricks)) %>% components() %>% select(-.model)
+Decomp_Bricks
+Decomp_Bricks %>% model(NAIVE(season_adjust)) %>%
+  forecast() %>%
+  autoplot(Decomp_Bricks)
+
+DB <- Bricks_Aus %>% model(stlf = decomposition_model(STL(Bricks ~ trend(window = 7), robust = TRUE),
+                                                NAIVE(season_adjust))) %>% forecast() %>% autoplot(Bricks_Aus)
+DB 
+
+DB2 <- Bricks_Aus %>% model(stlf = decomposition_model(STL(Bricks ~ trend(window = 7), robust = TRUE),
+                                                NAIVE(season_adjust)))
+
+aug <- Bricks_Aus%>%
+  model(NAIVE(Bricks))%>%
+  augment()
+autoplot(aug, .innov)
+
+aug %>% ACF(.innov) %>% autoplot
+
+###In my opinion, the residuals do look to be correlated. For instance, the fourth, eighth, twelfth, sixteenth, and twentieth lags are very strongly correlated with their "great-great grandchild" lags, while the second, sixth, tenth, fourteenth, eighteenth, and twenty-second lags are all strongly negatively correlated. Also, this pattern appears to consistently repeat and has many correlations that are out of bounds. Because over 5% of lags are out of bounds, this data series is not white noise, so yes- I do believe the residuals are correlated.
+```
+
+#Extra Credit: Amtrak
+
+```{r}
+###Use Amtrak data to answer the following questions. 
+###Amtrak (railroad company in the US) has collected the monthly number of riders. The data is given as "Amtrak.xlsx" as a csv Excel file. The time series starts in January 1991, ends in March 2004, and has a frequency of 12 months per year. Amtrak wants to use the data to forecast the possible riders for the future.  Please  answer  the  following  questions  below.  Use tidyverse  and  fpp3  packages  and  commands  to  answer  the questions. 
+ library(fpp3)
+library(tidyverse)
+###a. Convert the data into tsibble format. Write all your R commands. Explain the steps in converting the data. What is the name of the column you use as index in tsibble command. Explain briefly all steps. 
+ AmtrakData <- readxl::read_xlsx("C:/Users/Lauren/Downloads/Econ_Business_Forecasting/Amtrak.xlsx")
+AmtrakData
+Amtrak_Tsibble <- AmtrakData %>%
+  mutate(MONTH = yearmonth(Month)) %>% ###adding new column MONTH that mutates Month into yearmonth Tsibble compatible format.
+  select(-Month) %>% ###dropping original Month column that is not Tsibble compatible
+  as_tsibble(
+    index = MONTH, ###index is equal to the column that determines the time series.
+    key = c(Ridership)) ###The key is equal to all other columns, not including the time one. In this case the only key variable is ridership.
+Amtrak_Tsibble
+###b. Plot the series ridership, which is named as ridership in your series now, to see if there is a pattern in the data. Is there a pattern in your data? Explain. 
+Amtrak_Tsibble %>% autoplot(Ridership)
+Amtrak_ts <- ts(Amtrak_Tsibble, start = 1991, end = 2017, frequency = 12)
+Amtrak_ts
+autoplot(Amtrak_ts[, "Ridership"])
+###There is a pattern in the data.Ridership seemed to steadily increase from 1991 to 2004 where it peaked and then decreased dramatically. The same pattern seems to repear from 2005 to 2017, with the two lines for ridership over time for the two sets of years mimicking each other closely.
+###Use Amtrak data set. After converting it into tsibble format , then: 
+ 
+###c. Find the seasonal plot of the data for each year. Which command do you use? write your command. What does this graph tell you? Explain. 
+ ggseasonplot(Amtrak_ts[, "Ridership"])
+ ###I used GGseasonplot to create a seasonal plot of the data. This command shows me the same pattern that I saw in the Autoplot above, but more in depth.In the season plot, I see that in April of 2004 was when Ridership dropped significantly,a and then year by year began to steadily increase in a very similar way to what was seen from 1991 to 2004.
+###d. Use gg_subseries() command. Plot it and interpret the plot. What kind of pattern do you see? Conclude. 
+ ggsubseriesplot(Amtrak_ts[, "Ridership"])
+ ###From the subseries plot, I see that Ridership seems to peak at the same two times every month, near the middle and at the end. From this data, I can conclude that those two times every month are the busiest because people are travelling more.
+###e. Find the 12 lag of the series by using gg_lag() function. Comment on the result. 
+gglagplot(Amtrak_ts[,"Ridership"])
+###f. Find the autocorrelation of series ,maximum lag 12. Use ACF() command. What do you see? 
+ ACF
+###g. Show the plot of autocorrelation at maximum lag 12. Which lag has more autocorrelation. Interpret the plot briefly. 
+ 
+
+###h. Use Amtrak data set.  
+####-Create a new data set by filtering it after 1997. Give it a new name. 
+Amtrak_After_1997 <- Amtrak_Tsibble %>% filter(year(MONTH)>1997)
+####Plot the new series, which is after 1997. 
+ggplot(Amtrak_After_1997, aes(x=MONTH, y=Ridership))+geom_point()
+###Divide the Ridership into 1000. Hint: Use mutate() command. Plot the new series with names in y and x axis, add a title as “Montlhy ridership in thousands” 
+###Find the seasonal decomposition of monthly ridership (after 1997 data) by using STL() command. What do you see. 
+###Get seasonally adjusted data from the series 
+### Find the annual ridership for each year. (Hint: use sum() command. Write the command and plot the data. 
+ Annual_Ridership <- Amtrak_After_1997 %>%
+  index_by(Year = year(MONTH)) %>%
+  summarise(Ridership = sum(Ridership)) 
+ Annual_Ridership %>% autoplot()
+###i. Use Amtrak data set, starting from 1991 (original data). 
+
+###j. Run a linear regression of Ridership on its trend.(Hint: use TSLM() and trend().
+### Fit_Amtrak <- Amtrak_Tsibble %>% model(trend_model = TSLM(Ridership~ trend()))
+### Fit_Amtrak
+###k. By using this model, forecast it for the next 3 years. 
+###What are the values of the next 3 years, monthly values? Give the first 3 values, and save all of them to a new series. 
+###l. Plot the forecast values with the original data.  
+###m. Get the residuals from the model. And check the residuals to check whether or not it satisfies the requirements for white noise error terms.(hint: augment() and gg_tsresiduals() functions) 
+###n. Use SNAIVE, NAÏVE, RW models. Which one has the lowest RMSE to be used for the forecast. (Hint: use accuracy() function to see it) 
+###o. Save the seasonally adjusted series of ridership. Plot it. 
+```
